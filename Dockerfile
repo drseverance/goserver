@@ -1,7 +1,22 @@
+# ---------- Build Stage ----------
+FROM golang:1.26.3 AS builder
+
+WORKDIR /app
+
+COPY go.mod ./
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o goserver .
+
+# ---------- Runtime Stage ----------
 FROM debian:stable-slim
 
-COPY goserver /bin/goserver
+WORKDIR /app
+
+COPY --from=builder /app/goserver .
 
 ENV PORT=8991
 
-CMD ["/bin/goserver"]
+EXPOSE 8991
+
+CMD ["./goserver"]
