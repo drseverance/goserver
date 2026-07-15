@@ -174,6 +174,44 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+
+func deleteUser(w http.ResponseWriter, r *http.Request) {
+
+	idString := strings.TrimPrefix(r.URL.Path, "/users/")
+
+	id, err := strconv.Atoi(idString)
+
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	result, err := db.Exec(
+		"DELETE FROM users WHERE id=$1",
+		id,
+	)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := result.RowsAffected()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == 0 {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+
 func main() {
 	err := godotenv.Load("../.env")
 
@@ -216,11 +254,13 @@ func main() {
 	case http.MethodPut:
 		updateUser(w, r)
 
+	case http.MethodDelete:
+		deleteUser(w, r)
+
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 })
-
 http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
