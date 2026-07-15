@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -84,6 +86,43 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func getUserByID(w http.ResponseWriter, r *http.Request) {
+
+	idString := strings.TrimPrefix(r.URL.Path, "/users/")
+
+	id, err := strconv.Atoi(idString)
+
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+
+	err = db.QueryRow(
+		"SELECT id, name, email FROM users WHERE id=$1",
+		id,
+	).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+	)
+
+	if err == sql.ErrNoRows {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(user)
+}
+
 func main() {
 	err := godotenv.Load("../.env")
 
@@ -115,6 +154,8 @@ func main() {
 	}
 
 	fmt.Println("Connected to PostgreSQL")
+
+	http.HandleFunc("/users/", getUserByID)
 
 	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 
