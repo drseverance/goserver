@@ -123,6 +123,57 @@ func getUserByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+func updateUser(w http.ResponseWriter, r *http.Request) {
+
+	idString := strings.TrimPrefix(r.URL.Path, "/users/")
+
+	id, err := strconv.Atoi(idString)
+
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var user User
+
+	err = json.NewDecoder(r.Body).Decode(&user)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	result, err := db.Exec(
+		"UPDATE users SET name=$1, email=$2 WHERE id=$3",
+		user.Name,
+		user.Email,
+		id,
+	)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rows, err := result.RowsAffected()
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if rows == 0 {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	user.ID = id
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(user)
+}
+
 func main() {
 	err := godotenv.Load("../.env")
 
@@ -155,9 +206,22 @@ func main() {
 
 	fmt.Println("Connected to PostgreSQL")
 
-	http.HandleFunc("/users/", getUserByID)
+	http.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
 
-	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+
+	case http.MethodGet:
+		getUserByID(w, r)
+
+	case http.MethodPut:
+		updateUser(w, r)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+})
+
+http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 
