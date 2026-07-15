@@ -57,7 +57,32 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(users)
 }
+func createUser(w http.ResponseWriter, r *http.Request) {
 
+	var user User
+
+	err := json.NewDecoder(r.Body).Decode(&user)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = db.QueryRow(
+		"INSERT INTO users(name, email) VALUES($1, $2) RETURNING id",
+		user.Name,
+		user.Email,
+	).Scan(&user.ID)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(user)
+}
 
 func main() {
 	err := godotenv.Load("../.env")
@@ -91,7 +116,20 @@ func main() {
 
 	fmt.Println("Connected to PostgreSQL")
 
-	http.HandleFunc("/users", getUsers)
+	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+
+	switch r.Method {
+
+	case http.MethodGet:
+		getUsers(w, r)
+
+	case http.MethodPost:
+		createUser(w, r)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+})
 
 	fmt.Println("Server running on port 8991")
 
