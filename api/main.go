@@ -211,13 +211,29 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
 
-func main() {
-	err := godotenv.Load("../.env")
+	err := db.Ping()
 
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":   "ok",
+		"database": "connected",
+	})
+}
+
+func main() {
+	// Load .env for local development.
+	// Docker Compose provides environment variables directly.
+	godotenv.Load()
+
+	var err error
 
 	db, err = sql.Open(
 		"postgres",
@@ -243,6 +259,8 @@ func main() {
 	}
 
 	fmt.Println("Connected to PostgreSQL")
+
+	http.HandleFunc("/health", healthHandler)
 
 	http.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
 
