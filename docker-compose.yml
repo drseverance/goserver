@@ -24,6 +24,27 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    image: postgres:17
+    container_name: postgres-migrate
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./migrations:/migrations
+
+    command:
+      [
+      "sh",
+      "-c",
+      "PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /migrations/001_create_users.sql"
+      ]
+
 
   api:
     build:
