@@ -14,6 +14,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
+
+type DB interface {
+	Ping() error
+}
+
+
 var db *sql.DB
 
 type User struct {
@@ -213,6 +219,23 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "ok",
+	})
+
+}
+
+
+func readyHandler(w http.ResponseWriter, r *http.Request) {
+
+	if db == nil {
+		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+
 	err := db.Ping()
 
 	if err != nil {
@@ -223,7 +246,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":   "ok",
+		"status":   "ready",
 		"database": "connected",
 	})
 }
@@ -261,21 +284,22 @@ func main() {
 	fmt.Println("Connected to PostgreSQL")
 
 	http.HandleFunc("/health", healthHandler)
+	http.HandleFunc("/ready", readyHandler)
 
 	http.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
 
-	switch r.Method {
+		switch r.Method {
 
-	case http.MethodGet:
+	 	case http.MethodGet:
 		getUserByID(w, r)
 
-	case http.MethodPut:
+		case http.MethodPut:
 		updateUser(w, r)
 
-	case http.MethodDelete:
+		case http.MethodDelete:
 		deleteUser(w, r)
 
-	default:
+		default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 })
