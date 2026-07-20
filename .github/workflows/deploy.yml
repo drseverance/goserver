@@ -20,3 +20,5 @@ jobs:
             cd ~/projects/go-api
             git pull
             docker compose up -d --build
+            sleep 10
+            curl -f http://localhost:8991/health
