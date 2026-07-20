@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: postgres:17
+    container_name: postgres-migrate
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./migrations:/migrations
+
+    command:
+      [
+      "sh",
+      "-c",
+      "PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -f /migrations/001_create_users.sql"
+      ]
+
+
+  api:
+    build:
+      context: ./api
+
+    container_name: go-api
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "8991:8991"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8991/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
